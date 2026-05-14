@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Starborne Garden</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        html, body {
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            user-select: none;
+            /* touch-action: none prevents browser zooming/scrolling, making pointer events perfectly reliable */
+            touch-action: none; 
+            background: #0E0E10; /* Updated background color */
+        }
+        canvas {
+            display: block;
+            /* The CSS size will remain 100vw/vh, while the internal JS resolution handles high-DPI scaling */
+            width: 100vw;
+            height: 100vh;
+        }
+        
+        #ios-overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-family: system-ui, -apple-system, sans-serif;
+            z-index: 10;
+            display: none; /* Hidden by default, shown via JS if needed */
+        }
+        #ios-overlay button {
+            margin-top: 20px;
+            padding: 12px 24px;
+            background: #4A90E2;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="canvas"></canvas>
+    
+    <div id="ios-overlay">
+        <h2>Enable Device Motion</h2>
+        <p>Experience the reactive garden.</p>
+        <button id="start-btn">Start Experience</button>
+    </div>
+
+    <script>
+        // ========== CONFIG ==========
+        const config = {
+            particleCount: 400, // Slightly reduced for mobile-friendly standard, adjust as needed
+            connectRadius: 80,
+            connectRadiusSq: 80 * 80, // Pre-calculated squared radius for faster distance checking
+            maxLineWidth: 2.5,
+            minLineWidth: 0.3,
+            lineAlphaFactor: 0.6,
+            decayRate: 0.98,
+            reconnectionTime: 1500,
+            cameraZ: 400
+        };
+
+        const palette = [
+            [246, 48, 73],  // #f63049
+            [208, 39, 82],  // #d02752
+            [138, 36, 75]   // #8a244b
+        ];
+
+        // ========== SETUP & HIGH-DPI SCALING ==========
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d', { alpha: false }); // alpha: false helps performance since background is drawn manually
+        let width, height;
+
+        const resizeCanvas = () => {
+            // Get the device pixel ratio, falling back to 1.
+            const dpr = window.devicePixelRatio || 1;
+            
+            // Set the actual internal canvas resolution to match physical pixels
+            canvas.width = window.innerWidth * dpr;
+            canvas.height = window.innerHeight * dpr;
+            
+            // Set the CSS display size to match logical pixels
+            canvas.style.width = window.innerWidth + 'px';
+            canvas.style.height = window.innerHeight + 'px';
+            
+            // Scale the context so all drawing commands naturally account for the DPR
+            ctx.scale(dpr, dpr);
+            
+            // Store logical dimensions for our math calculations
+            width = window.innerWidth;
+            height = window.innerHeight;
+        };
+
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas(); // Initialize on load
+
+        // ========== PARTICLE CLASS ==========
+        class Particle {
+            constructor() {
+                this.n = Math.floor(Math.random() * 3) + 1; // 1, 2, 3
+                this.a = Math.random() * 5 + 2; // [2,7]
+                this.baseRadius = Math.random() * 200 + 50; // [50,250]
+                this.omega = (Math.random() * 0.01) - 0.005; // [-0.005, 0.005]
+                this.theta = Math.random() * Math.PI * 2;
+                this.speed = Math.random() * 0.002 + 0.001;
+                this.baseColor = palette[Math.floor(Math.random() * palette.length)];
+                this.reconnectTimer = 0;
+                this.rippleX = 0;
+                this.rippleY = 0;
+                
+                // Caching variables to avoid re-declaring them in update loops
+                this.x = 0; this.y = 0; this.z = 0;
+                this.screenX = 0; this.screenY = 0; this.scale = 1;
+            }
+
+            update(time, deltaTime) {
+                this.theta += this.speed;
+                const r = this.baseRadius + this.a * Math.cos(this.n * this.theta + this.omega * time);
+                this.x = Math.cos(this.theta) * r;
+                this.y = Math.sin(this.theta) * r;
+                this.z = Math.sin(this.theta * 0.7) * r * 0.3;
+
+                // Apply ripple
+                this.x += this.rippleX;
+                this.y += this.rippleY;
+
+                // Decay ripple
+                this.rippleX *= config.decayRate;
+                this.rippleY *= config.decayRate;
+
+                // Update reconnect timer using actual deltaTime rather than hardcoded 16ms
+                if (this.reconnectTimer > 0) {
+                    this.reconnectTimer -= deltaTime; 
+                    if (this.reconnectTimer < 0) this.reconnectTimer = 0;
+                }
+            }
+
+            project() {
+                this.scale = config.cameraZ / (config.cameraZ - this.z);
+                this.screenX = this.x * this.scale + width / 2;
+                this.screenY = this.y * this.scale + height / 2;
+            }
+
+            draw() {
+                // OPTIMIZATION: Avoid save() and restore(). Apply scale directly to the radius.
+                ctx.beginPath();
+                ctx.arc(this.screenX, this.screenY, 1.2 * this.scale, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(${this.baseColor[0]}, ${this.baseColor[1]}, ${this.baseColor[2]}, 0.8)`;
+                ctx.fill();
+            }
+        }
+
+        // ========== PARTICLES ==========
+        const particles = [];
+        for (let i = 0; i < config.particleCount; i++) {
+            particles.push(new Particle());
+        }
+
+        // ========== INTERACTION ==========
+        let isPointerDown = false;
+        let pointerDownTime = 0;
+        let lastPointerX = 0;
+        let lastPointerY = 0;
+
+        const handlePointerDown = (e) => {
+            isPointerDown = true;
+            pointerDownTime = Date.now();
+            // Simplified: Pointer events inherently handle both mouse and touch correctly
+            lastPointerX = e.clientX;
+            lastPointerY = e.clientY;
+        };
+
+        const handlePointerMove = (e) => {
+            if (!isPointerDown) return;
+            const currentX = e.clientX;
+            const currentY = e.clientY;
+            const dx = currentX - lastPointerX;
+            const dy = currentY - lastPointerY;
+            lastPointerX = currentX;
+            lastPointerY = currentY;
+
+            // Apply directional ripple
+            const power = 1;
+            particles.forEach(p => {
+                p.rippleX += dx * 0.001 * power;
+                p.rippleY += dy * 0.001 * power;
+            });
+        };
+
+        const handlePointerUp = () => {
+            if (!isPointerDown) return;
+            const holdDuration = Date.now() - pointerDownTime;
+            if (holdDuration < 500) {
+                // Short tap: random ripple
+                const power = 1;
+                particles.forEach(p => {
+                    p.rippleX += (Math.random() - 0.5) * 10 * power;
+                    p.rippleY += (Math.random() - 0.5) * 10 * power;
+                });
+            } else {
+                // Long hold: activate reconnection timer
+                particles.forEach(p => {
+                    p.reconnectTimer = config.reconnectionTime;
+                });
+            }
+            isPointerDown = false;
+        };
+
+        // Pointer events replace mouse AND touch events simultaneously
+        canvas.addEventListener('pointerdown', handlePointerDown);
+        canvas.addEventListener('pointermove', handlePointerMove);
+        canvas.addEventListener('pointerup', handlePointerUp);
+        canvas.addEventListener('pointercancel', handlePointerUp);
+
+
+        // ========== DEVICE MOTION (iOS PERMISSION HANDLING) ==========
+        let lastAccelX = 0;
+        let lastAccelY = 0;
+
+        const handleMotion = (e) => {
+            if (!e.acceleration) return;
+            const accelX = e.acceleration.x || 0;
+            const accelY = e.acceleration.y || 0;
+            const deltaX = Math.abs(accelX - lastAccelX);
+            const deltaY = Math.abs(accelY - lastAccelY);
+            
+            if (deltaX > 0.5 || deltaY > 0.5) {
+                const power = 20;
+                particles.forEach(p => {
+                    p.rippleX += (accelX - lastAccelX) * power;
+                    p.rippleY += (accelY - lastAccelY) * power;
+                });
+            }
+            lastAccelX = accelX;
+            lastAccelY = accelY;
+        };
+
+        // Check if iOS needs explicit permission for device motion
+        if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+            const overlay = document.getElementById('ios-overlay');
+            const startBtn = document.getElementById('start-btn');
+            overlay.style.display = 'flex'; // Show overlay
+            
+            startBtn.addEventListener('click', () => {
+                DeviceMotionEvent.requestPermission()
+                    .then(response => {
+                        if (response == 'granted') {
+                            window.addEventListener('devicemotion', handleMotion);
+                        }
+                        overlay.style.display = 'none';
+                    })
+                    .catch(console.error);
+            });
+        } else {
+            // Non-iOS devices (Android, Desktop)
+            window.addEventListener('devicemotion', handleMotion);
+        }
+
+        // ========== RENDER LOOP ==========
+        let lastTime = 0;
+        
+        const render = (timestamp) => {
+            // Calculate true deltaTime for smooth physics regardless of screen refresh rate
+            if (!lastTime) lastTime = timestamp;
+            const deltaTime = timestamp - lastTime;
+            lastTime = timestamp;
+
+            // Semi-transparent clear for trail effect
+            // Updated to match the #0E0E10 background color (RGB: 14, 14, 16)
+            ctx.fillStyle = 'rgba(14, 14, 16, 0.2)'; 
+            ctx.fillRect(0, 0, width, height);
+
+            // Update and project particles
+            particles.forEach(p => {
+                p.update(timestamp, deltaTime);
+                p.project();
+            });
+
+            // Draw connections using optimized squared distance
+            ctx.lineCap = 'round'; // makes thick line ends look better
+            
+            for (let i = 0; i < particles.length; i++) {
+                const p1 = particles[i];
+                for (let j = i + 1; j < particles.length; j++) {
+                    const p2 = particles[j];
+                    if (p1.reconnectTimer > 0 || p2.reconnectTimer > 0) continue;
+
+                    const dx = p1.screenX - p2.screenX;
+                    const dy = p1.screenY - p2.screenY;
+                    const distSq = dx * dx + dy * dy;
+
+                    // OPTIMIZATION: Check squared distance first to avoid costly Math.sqrt on every pair
+                    if (distSq < config.connectRadiusSq) {
+                        const dist = Math.sqrt(distSq); // Only calc sqrt if within radius
+                        
+                        const alpha = (1 - dist / config.connectRadius) * config.lineAlphaFactor;
+                        const lineWidth = config.minLineWidth + (config.maxLineWidth - config.minLineWidth) * (1 - dist / config.connectRadius);
+                        
+                        const r = (p1.baseColor[0] + p2.baseColor[0]) / 2;
+                        const g = (p1.baseColor[1] + p2.baseColor[1]) / 2;
+                        const b = (p1.baseColor[2] + p2.baseColor[2]) / 2;
+
+                        ctx.beginPath();
+                        ctx.moveTo(p1.screenX, p1.screenY);
+                        ctx.lineTo(p2.screenX, p2.screenY);
+                        ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${alpha})`;
+                        ctx.lineWidth = lineWidth;
+                        ctx.stroke();
+                    }
+                }
+            }
+
+            // Draw particles
+            particles.forEach(p => p.draw());
+
+            requestAnimationFrame(render);
+        };
+
+        // Start animation loop
+        requestAnimationFrame(render);
+    </script>
+</body>
+</html>
