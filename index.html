@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0e0e10">
+  <meta name="description" content="An interactive garden of stars. Tap, drag, or hold to shape its connections.">
+  <title>Starborne Garden</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main>
+    <canvas id="garden" aria-label="Animated red particle garden" aria-describedby="instructions">An interactive garden of red stars. Use the controls to pause or reset the artwork.</canvas>
+    <header><p class="eyebrow">A little space to wander</p><h1>Starborne Garden</h1></header>
+    <aside id="hint" aria-label="Garden instructions">
+      <p id="instructions">Tap, drag, or hold to shape the garden.</p>
+      <button id="dismiss" aria-label="Dismiss instructions" title="Dismiss instructions">×</button>
+    </aside>
+    <footer>
+      <div class="controls" role="group" aria-label="Garden controls">
+        <button id="pause" aria-pressed="false">Pause</button>
+        <button id="reset">Reset</button>
+        <button id="motion" aria-pressed="false">Device motion</button>
+      </div>
+      <p id="status" role="status" aria-live="polite" aria-atomic="true"></p>
+    </footer>
+  </main>
+  <noscript><p class="fallback">Enable JavaScript to explore the garden.</p></noscript>
+  <script type="module" src="app.mjs"></script>
+</body>
+</html>

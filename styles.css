@@ -1,0 +1,23 @@
+:root { color-scheme: dark; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #0e0e10; color: #f4e8ed; }
+* { box-sizing: border-box; }
+body { margin: 0; }
+main { position: relative; height: 100vh; height: 100svh; min-height: 260px; overflow: hidden; }
+canvas { display: block; width: 100%; height: 100%; touch-action: pinch-zoom; }
+header { position: absolute; top: max(28px, env(safe-area-inset-top)); left: max(28px, env(safe-area-inset-left)); pointer-events: none; }
+.eyebrow { margin: 0 0 7px; color: #a68f99; font-size: 10px; letter-spacing: .2em; text-transform: uppercase; }
+h1 { margin: 0; font-size: clamp(18px, 3vw, 24px); font-weight: 450; letter-spacing: -.025em; }
+#hint { position: absolute; bottom: 112px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 8px; max-width: calc(100% - 32px); width: max-content; color: #c4aeb8; }
+#hint[hidden] { display: none; }
+#hint p { margin: 0; font-size: 12px; line-height: 1.5; }
+button { font: inherit; font-size: 12px; color: #d8c2cc; background: #171316e8; border: 1px solid #44303b; border-radius: 999px; min-height: 44px; padding: 0 18px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+button:hover { background: #2c1b25; color: #fff; border-color: #885066; }
+button:focus-visible { outline: 2px solid #f63049; outline-offset: 4px; }
+button[aria-pressed="true"] { border-color: #c14969; background: #3c1b2a; color: #ffe5ed; }
+button:disabled { opacity: .5; cursor: default; }
+#dismiss { border: 0; background: transparent; min-width: 44px; padding: 0; font-size: 20px; }
+footer { position: absolute; bottom: max(18px, env(safe-area-inset-bottom)); left: 16px; right: 16px; text-align: center; }
+.controls { display: flex; justify-content: center; gap: 8px; }
+#status { color: #bca2af; min-height: 18px; margin: 10px 0 0; font-size: 11px; line-height: 1.5; }
+.fallback { position: fixed; top: 45%; width: 100%; text-align: center; }
+@media (max-width: 420px) { header { top: max(22px, env(safe-area-inset-top)); left: 20px; } button { padding: 0 14px; } }
+@media (max-height: 450px) { header { top: 12px; } .eyebrow { display: none; } #hint { bottom: 92px; } footer { bottom: 8px; } }

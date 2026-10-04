@@ -1,76 +1,32 @@
-**Starborne Garden 🌌**
+# Starborne Garden
 
-Starborne Garden is a high-performance, interactive generative art experience built using Vanilla JavaScript and HTML5 Canvas. It features a reactive "plexus" system where particles form organic, constellation-like connections based on proximity and user interaction.
+A full-screen, red particle artwork with local ripples and gently shifting connections. A static site: no framework, dependencies, build step, accounts, or backend.
 
-**✨ Features**
+## Preview
 
-Fluid Interactive Constellations: Particles dynamically link to neighbors within a specific radius, creating a living network.
+Install Node.js 18 or newer, then run `npm start` and open http://127.0.0.1:4173. Set `PORT` to use another port. The preview server binds only to your computer and serves only the four public assets. Serve the site over HTTP rather than double-clicking `index.html`, because it uses JavaScript modules.
 
-**Mobile-First Design:**
+For deployment, upload `index.html`, `styles.css`, `app.mjs`, and `simulation.mjs` to any static host. Use HTTPS for device motion. The former `test.html` entry point is now `index.html`.
 
-High-DPI Support: Automatically detects and scales for Retina and 4K displays using window.devicePixelRatio.
+## Explore
 
-Touch Optimized: Uses modern Pointer Events to handle both mouse and touch input simultaneously.
+- **Tap:** nearby stars ripple outward within 120 logical pixels.
+- **Drag:** move at least 8 pixels to create a directional wake.
+- **Hold:** after 500 ms, nearby connections dissolve for 1.5 seconds.
+- **Pause / Resume:** freeze or resume the garden, including interaction effects.
+- **Reset:** restore the original arrangement without changing pause or motion settings.
+- **Device motion:** optionally enable gentle movement effects. Permission failures never block touch controls. Hardware support varies; some devices expose the API without supplying acceleration data.
 
-**Physics-Based Interactions:**
+Controls support keyboard navigation, visible focus, and screen-reader labels. Browser zoom remains enabled, including pinch zoom over the artwork. A second touch cancels artwork gestures. Reduced-motion preferences start the garden paused; Resume explicitly enables animation. Hidden tabs stop rendering. The instruction hint can be dismissed for the current page session.
 
-Directional Ripples: Dragging or swiping "pushes" the particles in the direction of motion.
+## Configuration and structure
 
-Haptic "Shatter": Long-pressing severs connections temporarily, causing a structural collapse of the garden.
+`simulation.mjs` contains particle state, elapsed-time updates, bounded forces, gesture classification, and spatial-grid neighbor searching. Adjust its `config` values to change particle count, connection distance, interaction radius, and gesture timing. The palette retains the original reds. `app.mjs` handles canvas rendering, controls, pointer capture, lifecycle, and optional sensor permission. `styles.css` handles the responsive presentation.
 
-Gyroscope Integration: On supported mobile devices, physical movement creates ripples based on the device's acceleration.
+Rendering is capped at 2× device pixel ratio. The garden scales to fit narrow and short screens; connection distance scales with it. Input radius stays at 120 logical pixels. Frames are clamped to 50 ms to prevent jumps after stalls. Particle movement, ripple decay, reconnection timers, and trail opacity use elapsed time.
 
-Optimized Performance: Uses squared-distance logic to minimize computational load during the rendering loop.
+## Checks
 
-🚀 How to Use
+Run `npm test` for deterministic simulation, refresh-rate equivalence, spatial-grid correctness, viewport fit, and gesture tests. Run `npm run benchmark` to compare grid search with exhaustive pair checks on the same seeded arrangement. This measures connection searching, not total frame time or browser FPS.
 
-Direct Launch: Open index.html in any modern web browser.
-
-Interact:
-
-Move/Drag: Move your mouse or finger to influence particle flow.
-
-Tap/Click: Create a sudden ripple effect.
-
-Hold: Disrupt the connections between stars.
-
-Mobile Permissions: On iOS, click the "Start Experience" button to enable the motion sensors (gyroscope).
-
-🛠️ Technical Details
-
-Mathematical Foundation
-
-Each particle follows a path based on a variation of the Rose Curve formula. The radial distance $r$ is calculated as:
-
-$$r = \text{baseRadius} + a \cdot \cos(n \cdot \theta + \omega \cdot t)$$
-
-Where:
-
-$a$ is the amplitude of the oscillation.
-
-$n$ determines the frequency of the petal-like movement.
-
-$\omega$ is the angular velocity over time $t$.
-
-Optimization Logic
-
-To maintain a high frame rate, the engine avoids costly square root operations when calculating distances between particles. Instead, it compares the squared distance:
-
-$$d^2 = \Delta x^2 + \Delta y^2$$
-
-Connections are only drawn if $d^2 < \text{connectRadius}^2$.
-
-🎨 Configuration
-
-You can customize the experience by adjusting the config constant in the script:
-
-const config = {
-    particleCount: 400, // Number of stars
-    connectRadius: 80,  // Distance for lines to form
-    decayRate: 0.98,    // Friction/decay for ripples
-};
-
-
-📄 License
-
-This project is open-source and free to use for personal or educational purposes.
+Before publishing, check a real phone for touch, pinch zoom, motion permission grant/denial, and sensor response. Also check reduced motion, keyboard controls, background-tab return, and portrait/landscape rotation. Browser emulation cannot validate physical device sensors.
