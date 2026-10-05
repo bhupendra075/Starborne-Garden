@@ -8,7 +8,7 @@ const publicFiles = new Set(['/index.html', '/styles.css', '/app.mjs', '/simulat
 const types = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8' };
 const port = Number(process.env.PORT || 4173);
 createServer(async (req, res) => {
-  if (!['GET', 'HEAD'].includes(req.method)) { res.writeHead(405); res.end(); return; }
+  if (!['GET', 'HEAD'].includes(req.method)) { res.writeHead(405, { Allow: 'GET, HEAD' }); res.end(); return; }
   try {
     const path = new URL(req.url, 'http://localhost').pathname;
     const route = path === '/' ? '/index.html' : path;
